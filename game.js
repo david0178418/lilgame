@@ -21,7 +21,6 @@ var body      = document.body
 ,   gravity   = 0.09
 ,   friction  = 0.90 // scales acceleration when touching a platform
 ,   speed     = 1.2
-,   lives     = 2
 ,   gameon    = true
     // -- platforms --
 ,   ticks     = 0 // a frame counter
@@ -59,9 +58,9 @@ function man (opts) {
     opts = opts || {};
     
     // instance members
+    this.pos = {};
     this.x = opts.x || canvas.width/1.3;
     this.y = opts.y || canvas.height/2;
-    this.lives = lives;
     this.width = 16;
     this.height = 16;
     this.accx = 0;
@@ -70,23 +69,13 @@ function man (opts) {
     this.vely = 0;
     this.state = 'air';
 }
+// static values
+man.MAX_JUMP_TIME = 200;
 
 // class members
 man.prototype.maxAcc = 0.5;
 man.prototype.maxVel = 3;
 man.prototype.accInc = 0.08;
-
-man.prototype.resetLocation = function () {
-    this.x = canvas.width / 1.3;
-    this.y = canvas.height / 2;
-};
-man.prototype.resetPhysics = function () {
-    this.accx = 0;
-    this.accy = 0;
-    this.velx = 0;
-    this.vely = 0;
-    this.state = 'air';
-};
 
 // class methods/functions
 man.prototype.render = function () {
@@ -96,29 +85,22 @@ man.prototype.render = function () {
     ctx.restore();
 };
 man.prototype.die = function () {
-    var dis = this; // create reference to close over
-    this.lives -= 1;
     gameon = false;
-    if (this.lives < 1) {
-        //gameon = false;
-    } else {
-        setTimeout (function () {
-            gameon = true;
-            console.log('start again');
-            dis.resetLocation();
-            dis.resetPhysics();
-            restart();
-
-        }, 2000);
-    }
+    man.state = "dead";
 };
 man.prototype.jump = function () {
     console.log('jump!');
-    if (this.state === 'air') { return; } // no jumping!
-    //this.vely = -this.maxVel * 4;
-    this.accy = -this.maxAcc*2.3;
-    this.velx -= speed; // retain platform speed effect
-    //this.y -= 6;
+
+    if(!~this.jumpStartTime) {
+        this.jumpStartTime = Date.now();
+        this.vely = -5;
+        this.velx -= speed; // retain platform speed effect
+    }
+
+    if(Date.now() - this.jumpStartTime < man.MAX_JUMP_TIME) {
+        this.accy = -gravity;
+    }
+
     this.state = 'air';
 };
 man.prototype.left = function () {
@@ -168,6 +150,7 @@ man.prototype.update = function () {
     // only latch to platform if we are moving downward
     if (foundground === true && this.accy >= 0) {
         this.state = 'ground';
+        this.jumpStartTime = -1;
         
         // latch our man to this platform height
         this.y = platforms[currplatform].y - this.height;
@@ -250,16 +233,6 @@ function update () {
         ctx.fillStyle = 'white';
         ctx.fillText(timer/1000, 20,20);
         
-        // draw lives
-        i = myman.lives;
-        ctx.fillStyle = 'green';
-
-        while (i > 0) {
-            ctx.fillRect(canvas.width - (i * 15), 10, 10, 10);
-            i -= 1;
-        }
-        
-        
         // debug -- draw man state
         ctx.fillStyle = 'yellow';
         ctx.fillText(myman.state, canvas.width - 50, canvas.height - 20);
@@ -287,11 +260,5 @@ window.addEventListener('keyup', function (e) {
 
 // start game - create a player, the first platform, start game loop
 myman = new man();
-
-function restart() {
-    platforms = [];
-    platforms.push({x: (canvas.width/1.3), y: canvas.height/1.5, length: 50});
-    update();
-}
-
-restart();
+platforms.push({x: (canvas.width/1.3), y: canvas.height/1.5, length: 50});
+update();
